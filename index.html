@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SEO 智能助手 - AI 驅動的內容行銷工具</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- API Key 設定模態框 -->
+    <div id="apiKeyModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>🔑 API 金鑰設定</h2>
+          <p class="modal-subtitle">開始使用前，請先設定你的 Anthropic API Key</p>
+        </div>
+        <div class="modal-body">
+          <label for="apiKeyInput">Anthropic API Key</label>
+          <input 
+            type="password" 
+            id="apiKeyInput" 
+            placeholder="sk-ant-api03-..." 
+            class="api-key-input"
+          />
+          <p class="hint">
+            💡 沒有 API Key？前往 
+            <a href="https://console.anthropic.com/" target="_blank">Anthropic Console</a> 
+            取得
+          </p>
+          <p class="hint security-note">
+            🔒 你的 API Key 僅儲存在瀏覽器本地，不會上傳到任何伺服器
+          </p>
+          <button onclick="saveApiKey()" class="btn-primary">儲存並開始使用</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 主要內容 -->
+    <header>
+      <div class="header-content">
+        <div>
+          <h1>SEO 智能助手</h1>
+          <p class="tagline">AI 驅動的內容行銷一站式解決方案</p>
+        </div>
+        <button onclick="openApiSettings()" class="btn-settings">⚙️ API 設定</button>
+      </div>
+    </header>
+
+    <main class="main-layout">
+      <!-- 側邊導航 -->
+      <aside class="sidebar">
+        <nav class="feature-nav">
+          <button class="nav-item active" onclick="switchTab('keywords')">
+            <span class="icon">🔍</span>
+            <span class="nav-text">關鍵字探測</span>
+          </button>
+          <button class="nav-item" onclick="switchTab('content')">
+            <span class="icon">✍️</span>
+            <span class="nav-text">內容生成</span>
+          </button>
+          <button class="nav-item" onclick="switchTab('distribute')">
+            <span class="icon">📢</span>
+            <span class="nav-text">內容分發</span>
+          </button>
+          <button class="nav-item" onclick="switchTab('health')">
+            <span class="icon">📊</span>
+            <span class="nav-text">SEO 健康度</span>
+          </button>
+        </nav>
+      </aside>
+
+      <!-- 主要內容區域 -->
+      <div class="content-wrapper">
+
+      <!-- 關鍵字探測器 -->
+      <section id="keywords" class="tab-content active">
+        <div class="feature-card">
+          <div class="card-header">
+            <h2>🔍 智能關鍵字探測器</h2>
+            <p>輸入你的業務類型，AI 將分析並生成高潛力的長尾關鍵字</p>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label for="businessType">業務類型或產品名稱</label>
+              <input 
+                id="businessType" 
+                type="text"
+                placeholder="例如：手工皮鞋、咖啡廳、網頁設計服務" 
+                class="input-field"
+              />
+            </div>
+            <div class="form-group">
+              <label for="targetAudience">目標受眾（選填）</label>
+              <input 
+                id="targetAudience" 
+                type="text"
+                placeholder="例如：25-35歲都會上班族、創業者" 
+                class="input-field"
+              />
+            </div>
+            <button onclick="detectKeywords()" class="btn-primary" id="keywordBtn">
+              <span class="btn-text">產生關鍵字建議</span>
+              <span class="loading-spinner" style="display: none;">⏳ 分析中...</span>
+            </button>
+            <div id="keywordResult" class="result-area"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- AI 內容生成器 -->
+      <section id="content" class="tab-content">
+        <div class="feature-card">
+          <div class="card-header">
+            <h2>✍️ AI 內容生成器</h2>
+            <p>輸入關鍵字，自動生成 SEO 優化的內容大綱與草稿</p>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label for="contentKeyword">主要關鍵字</label>
+              <input 
+                id="contentKeyword" 
+                type="text"
+                placeholder="例如：2026 手工皮鞋推薦" 
+                class="input-field"
+              />
+            </div>
+            <div class="form-group">
+              <label for="contentType">內容類型</label>
+              <select id="contentType" class="select-field">
+                <option value="blog">部落格文章</option>
+                <option value="guide">完整指南</option>
+                <option value="comparison">比較評測</option>
+                <option value="howto">教學文章</option>
+                <option value="qa">常見問答</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="contentLength">文章長度</label>
+              <select id="contentLength" class="select-field">
+                <option value="short">簡短（800-1200字）</option>
+                <option value="medium">中等（1500-2000字）</option>
+                <option value="long">深度（2500字以上）</option>
+              </select>
+            </div>
+            <button onclick="generateContent()" class="btn-primary" id="contentBtn">
+              <span class="btn-text">生成內容大綱</span>
+              <span class="loading-spinner" style="display: none;">⏳ 創作中...</span>
+            </button>
+            <div id="contentResult" class="result-area"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 一鍵分發 -->
+      <section id="distribute" class="tab-content">
+        <div class="feature-card">
+          <div class="card-header">
+            <h2>📢 智能內容分發</h2>
+            <p>將你的內容快速改寫為適合不同平台的版本</p>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label for="articleTitle">文章標題</label>
+              <input 
+                id="articleTitle" 
+                type="text"
+                placeholder="輸入文章標題" 
+                class="input-field"
+              />
+            </div>
+            <div class="form-group">
+              <label for="articleSummary">文章摘要或重點</label>
+              <textarea 
+                id="articleSummary" 
+                rows="4"
+                placeholder="輸入文章的核心內容或重點..." 
+                class="textarea-field"
+              ></textarea>
+            </div>
+            <div class="form-group">
+              <label>選擇分發平台</label>
+              <div class="checkbox-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="platformFB" checked />
+                  <span>📘 Facebook</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="platformIG" checked />
+                  <span>📷 Instagram</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="platformThreads" />
+                  <span>🧵 Threads</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="platformXHS" />
+                  <span>📕 小紅書</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="platformLinkedIn" />
+                  <span>💼 LinkedIn</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="platformGBP" checked />
+                  <span>🏢 Google 商家</span>
+                </label>
+              </div>
+              <p class="hint" style="margin-top: 12px;">
+                ℹ️ 本工具僅生成適合各平台的文案內容，不會自動發布。你需要複製文案後手動到各平台發布。
+              </p>
+            </div>
+            <button onclick="distributeContent()" class="btn-primary" id="distributeBtn">
+              <span class="btn-text">生成分發內容</span>
+              <span class="loading-spinner" style="display: none;">⏳ 改寫中...</span>
+            </button>
+            <div id="distributeResult" class="result-area"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SEO 健康度檢查 -->
+      <section id="health" class="tab-content">
+        <div class="feature-card">
+          <div class="card-header">
+            <h2>📊 SEO 健康度分析</h2>
+            <p>AI 分析你的網站並提供 SEO 優化建議</p>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label for="siteUrl">網站網址</label>
+              <input 
+                id="siteUrl" 
+                type="url"
+                placeholder="https://example.com" 
+                class="input-field"
+              />
+            </div>
+            <div class="form-group">
+              <label for="targetKeywords">目標關鍵字（選填）</label>
+              <input 
+                id="targetKeywords" 
+                type="text"
+                placeholder="例如：手工皮鞋、台北咖啡廳" 
+                class="input-field"
+              />
+            </div>
+            <button onclick="checkSeoHealth()" class="btn-primary" id="healthBtn">
+              <span class="btn-text">開始分析</span>
+              <span class="loading-spinner" style="display: none;">⏳ 檢查中...</span>
+            </button>
+            <div id="healthResult" class="result-area"></div>
+          </div>
+        </div>
+      </section>
+      </div><!-- content-wrapper -->
+    </main><!-- main-layout -->
+
+    <footer>
+      <p>Powered by Claude AI • 資料僅存於你的瀏覽器，確保隱私安全</p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>
