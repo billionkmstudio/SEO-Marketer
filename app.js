@@ -3,6 +3,8 @@
 // ========================================
 
 let API_KEY = null;
+// 設定你的 Cloudflare Worker 網址（部署後取得）
+const PROXY_URL = seomarketer.billionkmstudio.workers.dev; // ← 請替換成你的 Worker 網址
 
 // 檢查是否有儲存的 API Key
 function checkApiKey() {
@@ -48,7 +50,7 @@ function openApiSettings() {
 }
 
 // ========================================
-// Claude API 呼叫函數
+// Claude API 呼叫函數（使用代理）
 // ========================================
 
 async function callClaudeAPI(prompt, systemPrompt = '') {
@@ -57,12 +59,12 @@ async function callClaudeAPI(prompt, systemPrompt = '') {
   }
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    // 使用代理伺服器而非直接呼叫 API
+    const response = await fetch(PROXY_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': API_KEY,
-        'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
@@ -105,7 +107,7 @@ async function callClaudeAPI(prompt, systemPrompt = '') {
   } catch (error) {
     // 處理網路錯誤
     if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-      throw new Error('網路連線失敗或 CORS 錯誤。如果在本地測試，請使用 localhost 或架設本地伺服器。');
+      throw new Error('網路連線失敗。請確認：1) 已部署 Cloudflare Worker 2) PROXY_URL 設定正確');
     }
     throw error;
   }
