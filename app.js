@@ -1,7 +1,7 @@
 // ========================================
 // 設定區域 - 請在這裡設定你的 Cloudflare Worker 網址
 // ========================================
-const PROXY_URL = seomarketer.billionkmstudio.workers.dev; // ← 部署 Worker 後，將這裡改成你的網址
+const PROXY_URL = https://seomarketer.billionkmstudio.workers.dev/; // ← 部署 Worker 後，將這裡改成你的網址
 
 // ========================================
 // API Key 管理
