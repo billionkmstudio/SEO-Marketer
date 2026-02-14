@@ -1,10 +1,13 @@
 // ========================================
+// 設定區域 - 請在這裡設定你的 Cloudflare Worker 網址
+// ========================================
+const PROXY_URL = seomarketer.billionkmstudio.workers.dev; // ← 部署 Worker 後，將這裡改成你的網址
+
+// ========================================
 // API Key 管理
 // ========================================
 
 let API_KEY = null;
-// 設定你的 Cloudflare Worker 網址（部署後取得）
-const PROXY_URL = seomarketer.billionkmstudio.workers.dev; // ← 請替換成你的 Worker 網址
 
 // 檢查是否有儲存的 API Key
 function checkApiKey() {
@@ -58,8 +61,12 @@ async function callClaudeAPI(prompt, systemPrompt = '') {
     throw new Error('請先設定 API Key');
   }
 
+  // 檢查是否已設定 PROXY_URL
+  if (PROXY_URL === 'https://your-worker.workers.dev') {
+    throw new Error('請先設定 Cloudflare Worker 網址。請參考 DEPLOYMENT_GUIDE.md');
+  }
+
   try {
-    // 使用代理伺服器而非直接呼叫 API
     const response = await fetch(PROXY_URL, {
       method: 'POST',
       headers: {
@@ -87,7 +94,6 @@ async function callClaudeAPI(prompt, systemPrompt = '') {
         const error = JSON.parse(errorText);
         errorMessage = error.error?.message || errorMessage;
         
-        // 提供更友善的錯誤訊息
         if (errorMessage.includes('credit') || errorMessage.includes('balance')) {
           errorMessage = 'API 額度不足，請前往 Anthropic Console 查看';
         } else if (errorMessage.includes('invalid') && errorMessage.includes('api key')) {
@@ -96,7 +102,7 @@ async function callClaudeAPI(prompt, systemPrompt = '') {
           errorMessage = 'API 調用過於頻繁，請稍後再試';
         }
       } catch (e) {
-        // 無法解析錯誤訊息
+        // ignore
       }
       
       throw new Error(errorMessage + ' (狀態碼: ' + response.status + ')');
@@ -105,9 +111,8 @@ async function callClaudeAPI(prompt, systemPrompt = '') {
     const data = await response.json();
     return data.content[0].text;
   } catch (error) {
-    // 處理網路錯誤
     if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-      throw new Error('網路連線失敗。請確認：1) 已部署 Cloudflare Worker 2) PROXY_URL 設定正確');
+      throw new Error('網路連線失敗。請確認已正確設定 Cloudflare Worker');
     }
     throw error;
   }
@@ -118,7 +123,6 @@ async function callClaudeAPI(prompt, systemPrompt = '') {
 // ========================================
 
 function switchTab(tabName) {
-  // 移除所有 active 類別
   document.querySelectorAll('.tab-content').forEach(tab => {
     tab.classList.remove('active');
   });
@@ -126,7 +130,6 @@ function switchTab(tabName) {
     item.classList.remove('active');
   });
   
-  // 加入 active 類別到選中的分頁
   document.getElementById(tabName).classList.add('active');
   event.target.closest('.nav-item').classList.add('active');
 }
@@ -146,7 +149,6 @@ async function detectKeywords() {
     return;
   }
   
-  // 設定載入狀態
   btn.classList.add('loading');
   btn.disabled = true;
   resultArea.innerHTML = '';
@@ -182,17 +184,14 @@ ${targetAudience ? `目標受眾：${targetAudience}` : ''}
 
     const response = await callClaudeAPI(prompt, systemPrompt);
     
-    // 解析 JSON 回應
     let data;
     try {
-      // 移除可能的 markdown 程式碼區塊標記
       const cleanResponse = response.replace(/```json\n?|\n?```/g, '').trim();
       data = JSON.parse(cleanResponse);
     } catch (e) {
       throw new Error('無法解析 API 回應');
     }
     
-    // 顯示結果
     let html = '<h3>🎯 關鍵字建議</h3>';
     
     data.keywords.forEach((item, index) => {
@@ -313,7 +312,6 @@ async function generateContent() {
       throw new Error('無法解析 API 回應');
     }
     
-    // 顯示結果
     let html = `
       <h3>📝 內容大綱與草稿</h3>
       
@@ -474,7 +472,6 @@ async function distributeContent() {
       throw new Error('無法解析 API 回應');
     }
     
-    // 顯示結果
     let html = '<h3>📢 分發內容</h3><p class="hint" style="margin-bottom: 20px;">💡 請複製以下內容到對應平台手動發布</p>';
     
     const platformIcons = {
@@ -599,7 +596,6 @@ ${targetKeywords ? `目標關鍵字：${targetKeywords}` : ''}
       throw new Error('無法解析 API 回應');
     }
     
-    // 顯示結果
     let html = `
       <h3>📊 SEO 健康度報告</h3>
       
