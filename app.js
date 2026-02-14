@@ -670,8 +670,29 @@ ${targetKeywords ? `目標關鍵字：${targetKeywords}` : ''}
       html += `</ul></div>`;
     }
     
+    // 加入生成 PDF 報告按鈕
+    html += `
+      <div style="margin-top: 30px; text-align: center; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px;">
+        <button onclick="generateSEOPDF()" class="btn-pdf" style="background: white; color: #667eea; padding: 16px 32px; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: all 0.3s ease;">
+          📄 生成 PDF 報告
+        </button>
+        <p style="margin-top: 12px; color: white; font-size: 0.9rem; opacity: 0.9;">
+          將分析報告匯出為 PDF，方便分享給團隊成員
+        </p>
+      </div>
+    `;
+    
     resultArea.innerHTML = html;
     resultArea.classList.add('show');
+    
+    // 儲存報告數據以供 PDF 生成使用
+    window.seoReportData = {
+      siteUrl: siteUrl,
+      targetKeywords: targetKeywords,
+      date: new Date().toLocaleDateString('zh-TW'),
+      ...data
+    };
+    
     
   } catch (error) {
     resultArea.innerHTML = `<div class="error-message">❌ 錯誤：${error.message}</div>`;
@@ -690,6 +711,236 @@ function getScoreColor(score) {
   if (score >= 80) return '#27ae60';
   if (score >= 60) return '#f39c12';
   return '#e74c3c';
+}
+
+// ========================================
+// 生成 SEO PDF 報告
+// ========================================
+async function generateSEOPDF() {
+  if (!window.seoReportData) {
+    alert('找不到報告數據，請重新執行分析');
+    return;
+  }
+  
+  const data = window.seoReportData;
+  
+  // 顯示載入中
+  const btn = event.target;
+  const originalText = btn.innerHTML;
+  btn.innerHTML = '⏳ 生成中...';
+  btn.disabled = true;
+  
+  try {
+    // 使用 jsPDF 生成 PDF
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    let y = 20; // 當前 Y 座標
+    const pageHeight = doc.internal.pageSize.height;
+    const pageWidth = doc.internal.pageSize.width;
+    const margin = 20;
+    const maxWidth = pageWidth - 2 * margin;
+    
+    // 設定中文字體支援 (使用內建字體)
+    doc.setFont('helvetica');
+    
+    // 標題
+    doc.setFontSize(24);
+    doc.setTextColor(26, 77, 122);
+    doc.text('SEO 健康分析報告', margin, y);
+    y += 15;
+    
+    // 分隔線
+    doc.setDrawColor(243, 156, 18);
+    doc.setLineWidth(2);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 10;
+    
+    // 網站資訊
+    doc.setFontSize(12);
+    doc.setTextColor(90, 108, 125);
+    doc.text(`網站：${data.siteUrl}`, margin, y);
+    y += 7;
+    if (data.targetKeywords) {
+      doc.text(`目標關鍵字：${data.targetKeywords}`, margin, y);
+      y += 7;
+    }
+    doc.text(`分析日期：${data.date}`, margin, y);
+    y += 15;
+    
+    // 總體評分
+    doc.setFontSize(18);
+    doc.setTextColor(26, 77, 122);
+    doc.text('總體評分', margin, y);
+    y += 10;
+    
+    doc.setFontSize(36);
+    const scoreColor = getScoreColorRGB(data.overallScore);
+    doc.setTextColor(...scoreColor);
+    doc.text(data.overallScore.toString(), margin + 10, y);
+    
+    doc.setFontSize(12);
+    doc.setTextColor(90, 108, 125);
+    doc.text('/ 100', margin + 35, y);
+    y += 15;
+    
+    // 分項評分
+    doc.setFontSize(16);
+    doc.setTextColor(26, 77, 122);
+    doc.text('分項評分', margin, y);
+    y += 10;
+    
+    doc.setFontSize(11);
+    Object.entries(data.scores).forEach(([key, value]) => {
+      if (y > pageHeight - 30) {
+        doc.addPage();
+        y = 20;
+      }
+      
+      const color = getScoreColorRGB(value);
+      doc.setTextColor(0, 0, 0);
+      doc.text(`${key}:`, margin, y);
+      doc.setTextColor(...color);
+      doc.text(value.toString(), margin + 50, y);
+      y += 7;
+    });
+    y += 10;
+    
+    // 嚴重問題
+    if (data.criticalIssues && data.criticalIssues.length > 0) {
+      if (y > pageHeight - 40) {
+        doc.addPage();
+        y = 20;
+      }
+      
+      doc.setFontSize(16);
+      doc.setTextColor(231, 76, 60);
+      doc.text('嚴重問題', margin, y);
+      y += 10;
+      
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      data.criticalIssues.forEach((issue, index) => {
+        if (y > pageHeight - 20) {
+          doc.addPage();
+          y = 20;
+        }
+        const lines = doc.splitTextToSize(`${index + 1}. ${issue}`, maxWidth - 5);
+        doc.text(lines, margin + 5, y);
+        y += lines.length * 5 + 3;
+      });
+      y += 10;
+    }
+    
+    // 優化建議
+    if (y > pageHeight - 40) {
+      doc.addPage();
+      y = 20;
+    }
+    
+    doc.setFontSize(16);
+    doc.setTextColor(26, 77, 122);
+    doc.text('優化建議', margin, y);
+    y += 10;
+    
+    doc.setFontSize(10);
+    data.suggestions.forEach((suggestion, index) => {
+      if (y > pageHeight - 35) {
+        doc.addPage();
+        y = 20;
+      }
+      
+      // 優先級標籤
+      const priorityColor = 
+        suggestion.priority === '高' ? [231, 76, 60] :
+        suggestion.priority === '中' ? [243, 156, 18] : [39, 174, 96];
+      
+      doc.setTextColor(...priorityColor);
+      doc.setFontSize(11);
+      doc.text(`[${suggestion.priority}] ${suggestion.category}`, margin, y);
+      y += 6;
+      
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      const titleLines = doc.splitTextToSize(suggestion.title, maxWidth);
+      doc.text(titleLines, margin, y);
+      y += titleLines.length * 5;
+      
+      doc.setFont('helvetica', 'normal');
+      const descLines = doc.splitTextToSize(suggestion.description, maxWidth);
+      doc.text(descLines, margin, y);
+      y += descLines.length * 5;
+      
+      doc.setTextColor(90, 108, 125);
+      doc.setFontSize(9);
+      const impactLines = doc.splitTextToSize(`預期影響：${suggestion.impact}`, maxWidth);
+      doc.text(impactLines, margin, y);
+      y += impactLines.length * 4.5 + 8;
+    });
+    
+    // 快速改善項目
+    if (data.quickWins && data.quickWins.length > 0) {
+      if (y > pageHeight - 40) {
+        doc.addPage();
+        y = 20;
+      }
+      
+      doc.setFontSize(16);
+      doc.setTextColor(39, 174, 96);
+      doc.text('快速改善項目', margin, y);
+      y += 10;
+      
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      data.quickWins.forEach((win, index) => {
+        if (y > pageHeight - 20) {
+          doc.addPage();
+          y = 20;
+        }
+        const lines = doc.splitTextToSize(`${index + 1}. ${win}`, maxWidth - 5);
+        doc.text(lines, margin + 5, y);
+        y += lines.length * 5 + 3;
+      });
+    }
+    
+    // 頁尾
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(
+        `第 ${i} 頁，共 ${totalPages} 頁 | 由 SEO 智能助手生成 | ${data.date}`,
+        pageWidth / 2,
+        pageHeight - 10,
+        { align: 'center' }
+      );
+    }
+    
+    // 儲存 PDF
+    const fileName = `SEO分析報告_${data.siteUrl.replace(/https?:\/\//, '').replace(/\//g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+    
+    // 成功提示
+    btn.innerHTML = '✅ 已下載！';
+    setTimeout(() => {
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+    }, 2000);
+    
+  } catch (error) {
+    alert('生成 PDF 失敗：' + error.message + '\n\n請確認已載入 jsPDF 函式庫');
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+  }
+}
+
+// 輔助函數：將分數轉換為 RGB 顏色
+function getScoreColorRGB(score) {
+  if (score >= 80) return [39, 174, 96];  // 綠色
+  if (score >= 60) return [243, 156, 18]; // 橙色
+  return [231, 76, 60]; // 紅色
 }
 
 function copyToClipboard(text, button) {
