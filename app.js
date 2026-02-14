@@ -714,7 +714,7 @@ function getScoreColor(score) {
 }
 
 // ========================================
-// 生成 SEO PDF 報告（支援中文）
+// 生成 SEO PDF 報告（使用 html2pdf - 完美支援中文）
 // ========================================
 async function generateSEOPDF() {
   if (!window.seoReportData) {
@@ -731,241 +731,42 @@ async function generateSEOPDF() {
   btn.disabled = true;
   
   try {
-    // 使用 jsPDF with autoTable 插件
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
+    // 創建 PDF 內容的 HTML
+    const pdfContent = createPDFHTML(data);
     
-    let y = 20;
-    const pageHeight = doc.internal.pageSize.height;
-    const pageWidth = doc.internal.pageSize.width;
-    const margin = 15;
-    const maxWidth = pageWidth - 2 * margin;
+    // 創建臨時容器
+    const container = document.createElement('div');
+    container.innerHTML = pdfContent;
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    container.style.width = '210mm'; // A4 寬度
+    document.body.appendChild(container);
     
-    // 檢查是否需要換頁
-    const checkNewPage = (requiredSpace) => {
-      if (y + requiredSpace > pageHeight - 20) {
-        doc.addPage();
-        y = 20;
-        return true;
-      }
-      return false;
+    // 設定 PDF 選項
+    const opt = {
+      margin: [15, 15, 20, 15],
+      filename: `SEO分析報告_${data.siteUrl.replace(/https?:\/\//, '').replace(/[\/\:]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { 
+        scale: 2,
+        useCORS: true,
+        letterRendering: true,
+        logging: false
+      },
+      jsPDF: { 
+        unit: 'mm', 
+        format: 'a4', 
+        orientation: 'portrait',
+        compress: true
+      },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
     };
     
-    // 繪製標題（使用圖形代替中文）
-    doc.setFillColor(26, 77, 122);
-    doc.rect(0, 0, pageWidth, 40, 'F');
+    // 生成 PDF
+    await html2pdf().set(opt).from(container).save();
     
-    doc.setFontSize(28);
-    doc.setTextColor(255, 255, 255);
-    doc.text('SEO Health Analysis Report', pageWidth / 2, 25, { align: 'center' });
-    y = 50;
-    
-    // 網站資訊區塊
-    doc.setFillColor(248, 249, 252);
-    doc.rect(margin, y, maxWidth, 25, 'F');
-    
-    doc.setFontSize(10);
-    doc.setTextColor(90, 108, 125);
-    doc.text(`Website: ${data.siteUrl}`, margin + 5, y + 8);
-    if (data.targetKeywords) {
-      doc.text(`Keywords: ${data.targetKeywords}`, margin + 5, y + 15);
-    }
-    doc.text(`Date: ${data.date}`, margin + 5, y + 22);
-    y += 35;
-    
-    // 總體評分區塊
-    checkNewPage(40);
-    doc.setFontSize(16);
-    doc.setTextColor(26, 77, 122);
-    doc.text('Overall Score', margin, y);
-    y += 10;
-    
-    const scoreColor = getScoreColorRGB(data.overallScore);
-    doc.setFillColor(...scoreColor);
-    doc.circle(margin + 20, y + 8, 15, 'F');
-    
-    doc.setFontSize(32);
-    doc.setTextColor(255, 255, 255);
-    doc.text(data.overallScore.toString(), margin + 20, y + 12, { align: 'center' });
-    
-    doc.setFontSize(10);
-    doc.setTextColor(90, 108, 125);
-    doc.text('/ 100', margin + 40, y + 12);
-    y += 35;
-    
-    // 分項評分表格
-    checkNewPage(50);
-    doc.setFontSize(14);
-    doc.setTextColor(26, 77, 122);
-    doc.text('Category Scores', margin, y);
-    y += 8;
-    
-    const categories = {
-      '技術 SEO': 'Technical SEO',
-      '內容品質': 'Content Quality',
-      '使用者體驗': 'User Experience',
-      '行動友善': 'Mobile Friendly'
-    };
-    
-    Object.entries(data.scores).forEach(([key, value]) => {
-      checkNewPage(12);
-      
-      const engName = categories[key] || key;
-      const color = getScoreColorRGB(value);
-      
-      // 繪製分數條
-      doc.setFillColor(240, 240, 240);
-      doc.rect(margin, y, maxWidth, 8, 'F');
-      
-      const percentage = value / 100;
-      doc.setFillColor(...color);
-      doc.rect(margin, y, maxWidth * percentage, 8, 'F');
-      
-      // 分數文字
-      doc.setFontSize(10);
-      doc.setTextColor(0, 0, 0);
-      doc.text(engName, margin + 2, y + 5.5);
-      doc.text(value.toString(), margin + maxWidth - 15, y + 5.5);
-      
-      y += 12;
-    });
-    y += 5;
-    
-    // 嚴重問題
-    if (data.criticalIssues && data.criticalIssues.length > 0) {
-      checkNewPage(30);
-      
-      doc.setFillColor(254, 242, 242);
-      doc.rect(margin, y, maxWidth, 10, 'F');
-      
-      doc.setFontSize(14);
-      doc.setTextColor(231, 76, 60);
-      doc.text('Critical Issues', margin + 2, y + 7);
-      y += 15;
-      
-      doc.setFontSize(9);
-      doc.setTextColor(0, 0, 0);
-      data.criticalIssues.forEach((issue, index) => {
-        checkNewPage(15);
-        
-        const lines = doc.splitTextToSize(`${index + 1}. ${issue}`, maxWidth - 10);
-        doc.setFillColor(255, 255, 255);
-        doc.rect(margin + 2, y - 3, maxWidth - 4, lines.length * 5 + 2, 'F');
-        doc.text(lines, margin + 5, y);
-        y += lines.length * 5 + 5;
-      });
-      y += 5;
-    }
-    
-    // 優化建議
-    checkNewPage(30);
-    doc.setFontSize(14);
-    doc.setTextColor(26, 77, 122);
-    doc.text('Optimization Suggestions', margin, y);
-    y += 10;
-    
-    const priorityMap = {
-      '高': 'High',
-      '中': 'Medium',
-      '低': 'Low'
-    };
-    
-    const categoryMap = {
-      '技術': 'Technical',
-      '內容': 'Content',
-      '連結': 'Links',
-      '使用者體驗': 'UX'
-    };
-    
-    data.suggestions.forEach((suggestion, index) => {
-      checkNewPage(35);
-      
-      const priorityColor = 
-        suggestion.priority === '高' ? [231, 76, 60] :
-        suggestion.priority === '中' ? [243, 156, 18] : [39, 174, 96];
-      
-      // 優先級標籤
-      doc.setFillColor(...priorityColor);
-      doc.rect(margin, y, maxWidth, 8, 'F');
-      
-      doc.setFontSize(10);
-      doc.setTextColor(255, 255, 255);
-      const engPriority = priorityMap[suggestion.priority] || suggestion.priority;
-      const engCategory = categoryMap[suggestion.category] || suggestion.category;
-      doc.text(`[${engPriority}] ${engCategory}`, margin + 2, y + 5.5);
-      y += 12;
-      
-      // 標題
-      doc.setFontSize(10);
-      doc.setTextColor(0, 0, 0);
-      doc.setFont('helvetica', 'bold');
-      const titleLines = doc.splitTextToSize(suggestion.title, maxWidth - 4);
-      doc.text(titleLines, margin + 2, y);
-      y += titleLines.length * 5 + 2;
-      
-      // 描述
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      const descLines = doc.splitTextToSize(suggestion.description, maxWidth - 4);
-      doc.text(descLines, margin + 2, y);
-      y += descLines.length * 4.5 + 2;
-      
-      // 預期影響
-      doc.setTextColor(90, 108, 125);
-      doc.setFontSize(8);
-      const impactLines = doc.splitTextToSize(`Expected Impact: ${suggestion.impact}`, maxWidth - 4);
-      doc.text(impactLines, margin + 2, y);
-      y += impactLines.length * 4 + 8;
-    });
-    
-    // 快速改善項目
-    if (data.quickWins && data.quickWins.length > 0) {
-      checkNewPage(30);
-      
-      doc.setFillColor(232, 245, 233);
-      doc.rect(margin, y, maxWidth, 10, 'F');
-      
-      doc.setFontSize(14);
-      doc.setTextColor(39, 174, 96);
-      doc.text('Quick Wins', margin + 2, y + 7);
-      y += 15;
-      
-      doc.setFontSize(9);
-      doc.setTextColor(0, 0, 0);
-      data.quickWins.forEach((win, index) => {
-        checkNewPage(15);
-        
-        const lines = doc.splitTextToSize(`${index + 1}. ${win}`, maxWidth - 10);
-        doc.setFillColor(255, 255, 255);
-        doc.rect(margin + 2, y - 3, maxWidth - 4, lines.length * 5 + 2, 'F');
-        doc.text(lines, margin + 5, y);
-        y += lines.length * 5 + 5;
-      });
-    }
-    
-    // 頁尾
-    const totalPages = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= totalPages; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setTextColor(150, 150, 150);
-      doc.setDrawColor(200, 200, 200);
-      doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
-      doc.text(
-        `Page ${i} of ${totalPages} | Generated by SEO Assistant | ${data.date}`,
-        pageWidth / 2,
-        pageHeight - 10,
-        { align: 'center' }
-      );
-    }
-    
-    // 儲存 PDF
-    const fileName = `SEO_Analysis_${data.siteUrl.replace(/https?:\/\//, '').replace(/[\/\:]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
-    doc.save(fileName);
+    // 移除臨時容器
+    document.body.removeChild(container);
     
     // 成功提示
     btn.innerHTML = '✅ 已下載！';
@@ -980,6 +781,142 @@ async function generateSEOPDF() {
     btn.innerHTML = originalText;
     btn.disabled = false;
   }
+}
+
+// 創建 PDF 的 HTML 內容
+function createPDFHTML(data) {
+  const scoreColor = getScoreColor(data.overallScore);
+  
+  let html = `
+    <div style="font-family: 'Noto Sans TC', 'Microsoft YaHei', sans-serif; color: #1a2332; line-height: 1.6;">
+      
+      <!-- 封面 -->
+      <div style="background: linear-gradient(135deg, #1a4d7a 0%, #0f3555 100%); color: white; padding: 40px 30px; text-align: center; margin-bottom: 30px; border-radius: 8px;">
+        <h1 style="font-size: 32px; margin: 0 0 15px 0; font-weight: 900;">SEO 健康分析報告</h1>
+        <p style="font-size: 14px; opacity: 0.9; margin: 0;">專業網站 SEO 診斷與優化建議</p>
+      </div>
+      
+      <!-- 網站資訊 -->
+      <div style="background: #f8f9fc; padding: 20px; border-radius: 8px; margin-bottom: 25px; border-left: 4px solid #f39c12;">
+        <div style="margin-bottom: 8px;"><strong>網站：</strong>${data.siteUrl}</div>
+        ${data.targetKeywords ? `<div style="margin-bottom: 8px;"><strong>目標關鍵字：</strong>${data.targetKeywords}</div>` : ''}
+        <div><strong>分析日期：</strong>${data.date}</div>
+      </div>
+      
+      <!-- 總體評分 -->
+      <div style="text-align: center; margin-bottom: 30px;">
+        <h2 style="color: #1a4d7a; margin-bottom: 15px; font-size: 24px;">總體評分</h2>
+        <div style="display: inline-block; width: 120px; height: 120px; border-radius: 50%; background: ${scoreColor}; color: white; line-height: 120px; font-size: 48px; font-weight: 900; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+          ${data.overallScore}
+        </div>
+        <div style="margin-top: 10px; color: #5a6c7d; font-size: 16px;">滿分 100</div>
+      </div>
+      
+      <!-- 分項評分 -->
+      <h2 style="color: #1a4d7a; margin: 30px 0 15px 0; font-size: 22px; border-bottom: 2px solid #f39c12; padding-bottom: 8px;">分項評分</h2>
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 30px;">
+  `;
+  
+  Object.entries(data.scores).forEach(([key, value]) => {
+    const color = getScoreColor(value);
+    html += `
+      <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e1e8ed; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-weight: 600; color: #1a2332;">${key}</span>
+          <span style="font-size: 24px; font-weight: 700; color: ${color};">${value}</span>
+        </div>
+        <div style="background: #f0f0f0; height: 8px; border-radius: 4px; overflow: hidden;">
+          <div style="background: ${color}; height: 100%; width: ${value}%; transition: width 0.3s;"></div>
+        </div>
+      </div>
+    `;
+  });
+  
+  html += `</div>`;
+  
+  // 嚴重問題
+  if (data.criticalIssues && data.criticalIssues.length > 0) {
+    html += `
+      <div style="page-break-inside: avoid; margin-bottom: 25px;">
+        <h2 style="color: #e74c3c; margin: 25px 0 15px 0; font-size: 22px; border-bottom: 2px solid #e74c3c; padding-bottom: 8px;">🚨 嚴重問題</h2>
+        <div style="background: #fee; padding: 20px; border-radius: 8px; border-left: 4px solid #e74c3c;">
+          <ol style="margin: 0; padding-left: 20px;">
+    `;
+    
+    data.criticalIssues.forEach(issue => {
+      html += `<li style="margin-bottom: 10px; color: #721c24;">${issue}</li>`;
+    });
+    
+    html += `
+          </ol>
+        </div>
+      </div>
+    `;
+  }
+  
+  // 優化建議
+  html += `
+    <h2 style="color: #1a4d7a; margin: 30px 0 15px 0; font-size: 22px; border-bottom: 2px solid #f39c12; padding-bottom: 8px;">💡 優化建議</h2>
+  `;
+  
+  data.suggestions.forEach((suggestion, index) => {
+    const priorityColor = 
+      suggestion.priority === '高' ? '#e74c3c' :
+      suggestion.priority === '中' ? '#f39c12' : '#27ae60';
+    
+    const priorityBg = 
+      suggestion.priority === '高' ? '#fee' :
+      suggestion.priority === '中' ? '#fff3cd' : '#d4edda';
+    
+    html += `
+      <div style="page-break-inside: avoid; margin-bottom: 20px; background: white; border: 1px solid #e1e8ed; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+        <div style="background: ${priorityColor}; color: white; padding: 10px 15px; font-weight: 600;">
+          [${suggestion.priority}優先級] ${suggestion.category}
+        </div>
+        <div style="padding: 15px;">
+          <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #1a2332;">${suggestion.title}</h3>
+          <p style="margin: 0 0 10px 0; color: #5a6c7d; line-height: 1.8;">${suggestion.description}</p>
+          <div style="background: ${priorityBg}; padding: 10px; border-radius: 4px; border-left: 3px solid ${priorityColor};">
+            <strong style="color: ${priorityColor};">預期影響：</strong>
+            <span style="color: #1a2332;">${suggestion.impact}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+  
+  // 快速改善項目
+  if (data.quickWins && data.quickWins.length > 0) {
+    html += `
+      <div style="page-break-inside: avoid; margin-top: 30px;">
+        <h2 style="color: #27ae60; margin: 25px 0 15px 0; font-size: 22px; border-bottom: 2px solid #27ae60; padding-bottom: 8px;">⚡ 快速改善項目</h2>
+        <div style="background: #d4edda; padding: 20px; border-radius: 8px; border-left: 4px solid #27ae60;">
+          <ol style="margin: 0; padding-left: 20px;">
+    `;
+    
+    data.quickWins.forEach(win => {
+      html += `<li style="margin-bottom: 10px; color: #155724;">${win}</li>`;
+    });
+    
+    html += `
+          </ol>
+        </div>
+      </div>
+    `;
+  }
+  
+  // 頁尾
+  html += `
+      <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #e1e8ed; text-align: center; color: #5a6c7d; font-size: 12px;">
+        <p style="margin: 5px 0;">本報告由 <strong style="color: #1a4d7a;">SEO 智能助手</strong> 生成</p>
+        <p style="margin: 5px 0;">技術支持：<strong style="color: #f39c12;">Billion Studio</strong></p>
+        <p style="margin: 5px 0;">生成日期：${data.date}</p>
+      </div>
+      
+    </div>
+  `;
+  
+  return html;
 }
 
 // 輔助函數：將分數轉換為 RGB 顏色
