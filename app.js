@@ -714,7 +714,7 @@ function getScoreColor(score) {
 }
 
 // ========================================
-// 生成 SEO PDF 報告（使用 html2pdf - 完美支援中文）
+// 生成 SEO PDF 報告（使用 jsPDF + AutoTable）
 // ========================================
 async function generateSEOPDF() {
   if (!window.seoReportData) {
@@ -722,64 +722,286 @@ async function generateSEOPDF() {
     return;
   }
   
-  // 檢查 html2pdf 是否已載入
-  if (typeof html2pdf === 'undefined') {
-    alert('PDF 函式庫載入失敗，請重新整理頁面後再試');
+  // 檢查函式庫
+  if (typeof jspdf === 'undefined' || typeof jspdf.jsPDF === 'undefined') {
+    alert('PDF 函式庫載入失敗，請重新整理頁面');
     return;
   }
   
   const data = window.seoReportData;
-  
-  // 顯示載入中
   const btn = event.target;
   const originalText = btn.innerHTML;
   btn.innerHTML = '⏳ 生成中...';
   btn.disabled = true;
   
   try {
-    // 創建 PDF 內容的 HTML
-    const pdfContent = createPDFHTML(data);
+    const { jsPDF } = jspdf;
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
     
-    // 創建臨時容器
-    const container = document.createElement('div');
-    container.innerHTML = pdfContent;
-    container.style.position = 'absolute';
-    container.style.left = '-9999px';
-    container.style.width = '210mm'; // A4 寬度
-    document.body.appendChild(container);
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+    const margin = 15;
+    let y = margin;
     
-    // 設定 PDF 選項
-    const opt = {
-      margin: [10, 10, 15, 10],
-      filename: `SEO分析報告_${data.siteUrl.replace(/https?:\/\//, '').replace(/[\/\:]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`,
-      image: { type: 'jpeg', quality: 0.95 },
-      html2canvas: { 
-        scale: 2,
-        useCORS: true,
-        letterRendering: true,
-        logging: false,
-        windowWidth: 794 // A4 寬度 (像素)
-      },
-      jsPDF: { 
-        unit: 'mm', 
-        format: 'a4', 
-        orientation: 'portrait'
-      },
-      pagebreak: { 
-        mode: ['avoid-all', 'css', 'legacy'],
-        before: '.page-break-before',
-        after: '.page-break-after',
-        avoid: '.no-break'
+    // 輔助函數：檢查換頁
+    const checkPageBreak = (neededSpace) => {
+      if (y + neededSpace > pageHeight - 20) {
+        doc.addPage();
+        y = margin;
+        return true;
       }
+      return false;
     };
     
-    // 生成並下載 PDF
-    await html2pdf().set(opt).from(container).save();
+    // 1. 標題背景
+    doc.setFillColor(26, 77, 122);
+    doc.rect(0, 0, pageWidth, 45, 'F');
     
-    // 移除臨時容器
-    document.body.removeChild(container);
+    // 標題文字
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.text('SEO Health Analysis Report', pageWidth / 2, 20, { align: 'center' });
     
-    // 成功提示
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Professional Website SEO Diagnosis & Optimization', pageWidth / 2, 30, { align: 'center' });
+    
+    y = 55;
+    
+    // 2. 網站資訊框
+    doc.setFillColor(248, 249, 252);
+    doc.rect(margin, y, pageWidth - 2 * margin, 25, 'F');
+    
+    doc.setDrawColor(243, 156, 18);
+    doc.setLineWidth(2);
+    doc.line(margin, y, margin, y + 25);
+    
+    doc.setTextColor(90, 108, 125);
+    doc.setFontSize(10);
+    doc.text(`Website: ${data.siteUrl}`, margin + 5, y + 8);
+    if (data.targetKeywords) {
+      doc.text(`Keywords: ${data.targetKeywords}`, margin + 5, y + 16);
+    }
+    doc.text(`Date: ${data.date}`, margin + 5, y + (data.targetKeywords ? 24 : 16));
+    
+    y += 35;
+    
+    // 3. 總體評分
+    checkPageBreak(40);
+    doc.setTextColor(26, 77, 122);
+    doc.setFontSize(16);
+    doc.text('Overall Score', pageWidth / 2, y, { align: 'center' });
+    y += 10;
+    
+    const scoreColor = getScoreColorRGB(data.overallScore);
+    doc.setFillColor(...scoreColor);
+    doc.circle(pageWidth / 2, y + 15, 18, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(36);
+    doc.setFont('helvetica', 'bold');
+    doc.text(data.overallScore.toString(), pageWidth / 2, y + 20, { align: 'center' });
+    
+    doc.setTextColor(90, 108, 125);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('/ 100', pageWidth / 2, y + 32, { align: 'center' });
+    
+    y += 45;
+    
+    // 4. 分項評分表格
+    checkPageBreak(60);
+    doc.setTextColor(26, 77, 122);
+    doc.setFontSize(14);
+    doc.text('Category Scores', margin, y);
+    y += 8;
+    
+    const categoryMap = {
+      '技術 SEO': 'Technical SEO',
+      '內容品質': 'Content Quality',
+      '使用者體驗': 'User Experience',
+      '行動友善': 'Mobile Friendly'
+    };
+    
+    const scoreTableData = Object.entries(data.scores).map(([key, value]) => {
+      const engName = categoryMap[key] || key;
+      return [engName, value.toString()];
+    });
+    
+    doc.autoTable({
+      startY: y,
+      head: [['Category', 'Score']],
+      body: scoreTableData,
+      theme: 'grid',
+      headStyles: { fillColor: [26, 77, 122], fontSize: 11 },
+      bodyStyles: { fontSize: 10 },
+      columnStyles: {
+        0: { cellWidth: 130 },
+        1: { cellWidth: 40, halign: 'center', fontStyle: 'bold' }
+      },
+      didDrawCell: function(data) {
+        if (data.column.index === 1 && data.section === 'body') {
+          const score = parseInt(data.cell.text[0]);
+          const color = getScoreColorRGB(score);
+          doc.setTextColor(...color);
+        }
+      }
+    });
+    
+    y = doc.lastAutoTable.finalY + 15;
+    
+    // 5. 嚴重問題
+    if (data.criticalIssues && data.criticalIssues.length > 0) {
+      checkPageBreak(40);
+      
+      doc.setFillColor(254, 242, 242);
+      doc.rect(margin, y, pageWidth - 2 * margin, 10, 'F');
+      doc.setDrawColor(231, 76, 60);
+      doc.setLineWidth(2);
+      doc.line(margin, y, margin, y + 10);
+      
+      doc.setTextColor(231, 76, 60);
+      doc.setFontSize(14);
+      doc.text('Critical Issues', margin + 5, y + 7);
+      y += 15;
+      
+      const issuesData = data.criticalIssues.map((issue, i) => [`${i + 1}`, issue]);
+      
+      doc.autoTable({
+        startY: y,
+        body: issuesData,
+        theme: 'plain',
+        styles: { fontSize: 9, cellPadding: 3 },
+        columnStyles: {
+          0: { cellWidth: 10, fontStyle: 'bold', textColor: [231, 76, 60] },
+          1: { cellWidth: 'auto' }
+        }
+      });
+      
+      y = doc.lastAutoTable.finalY + 15;
+    }
+    
+    // 6. 優化建議
+    checkPageBreak(30);
+    doc.setTextColor(26, 77, 122);
+    doc.setFontSize(14);
+    doc.text('Optimization Suggestions', margin, y);
+    y += 10;
+    
+    const priorityMap = {
+      '高': 'High',
+      '中': 'Medium',  
+      '低': 'Low'
+    };
+    
+    data.suggestions.forEach((suggestion, index) => {
+      checkPageBreak(35);
+      
+      const priorityColor = 
+        suggestion.priority === '高' ? [231, 76, 60] :
+        suggestion.priority === '中' ? [243, 156, 18] : [39, 174, 96];
+      
+      // 優先級標籤
+      doc.setFillColor(...priorityColor);
+      doc.rect(margin, y, pageWidth - 2 * margin, 8, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(10);
+      const engPriority = priorityMap[suggestion.priority] || suggestion.priority;
+      doc.text(`[${engPriority}] ${suggestion.category}`, margin + 3, y + 5.5);
+      
+      y += 12;
+      
+      // 建議內容
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      const titleLines = doc.splitTextToSize(suggestion.title, pageWidth - 2 * margin - 4);
+      doc.text(titleLines, margin + 2, y);
+      y += titleLines.length * 5 + 2;
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      const descLines = doc.splitTextToSize(suggestion.description, pageWidth - 2 * margin - 4);
+      doc.text(descLines, margin + 2, y);
+      y += descLines.length * 4.5 + 2;
+      
+      doc.setTextColor(90, 108, 125);
+      doc.setFontSize(8);
+      const impactLines = doc.splitTextToSize(`Impact: ${suggestion.impact}`, pageWidth - 2 * margin - 4);
+      doc.text(impactLines, margin + 2, y);
+      y += impactLines.length * 4 + 10;
+    });
+    
+    // 7. 快速改善項目
+    if (data.quickWins && data.quickWins.length > 0) {
+      checkPageBreak(40);
+      
+      doc.setFillColor(232, 245, 233);
+      doc.rect(margin, y, pageWidth - 2 * margin, 10, 'F');
+      doc.setDrawColor(39, 174, 96);
+      doc.setLineWidth(2);
+      doc.line(margin, y, margin, y + 10);
+      
+      doc.setTextColor(39, 174, 96);
+      doc.setFontSize(14);
+      doc.text('Quick Wins', margin + 5, y + 7);
+      y += 15;
+      
+      const winsData = data.quickWins.map((win, i) => [`${i + 1}`, win]);
+      
+      doc.autoTable({
+        startY: y,
+        body: winsData,
+        theme: 'plain',
+        styles: { fontSize: 9, cellPadding: 3 },
+        columnStyles: {
+          0: { cellWidth: 10, fontStyle: 'bold', textColor: [39, 174, 96] },
+          1: { cellWidth: 'auto' }
+        }
+      });
+    }
+    
+    // 8. 頁尾（所有頁面）
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.5);
+      doc.line(margin, pageHeight - 18, pageWidth - margin, pageHeight - 18);
+      
+      doc.setTextColor(150, 150, 150);
+      doc.setFontSize(8);
+      doc.text(
+        `Page ${i} of ${totalPages}`,
+        margin,
+        pageHeight - 12
+      );
+      
+      doc.text(
+        'Generated by SEO Assistant',
+        pageWidth / 2,
+        pageHeight - 12,
+        { align: 'center' }
+      );
+      
+      doc.text(
+        `Powered by Billion Studio | ${data.date}`,
+        pageWidth - margin,
+        pageHeight - 12,
+        { align: 'right' }
+      );
+    }
+    
+    // 儲存
+    const fileName = `SEO分析報告_${data.siteUrl.replace(/https?:\/\//, '').replace(/[\/\:]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+    
     btn.innerHTML = '✅ 已下載！';
     setTimeout(() => {
       btn.innerHTML = originalText;
@@ -787,155 +1009,18 @@ async function generateSEOPDF() {
     }, 2000);
     
   } catch (error) {
-    console.error('PDF generation error:', error);
-    
-    // 清理可能殘留的容器
-    const containers = document.querySelectorAll('[style*="-9999px"]');
-    containers.forEach(c => c.remove());
-    
-    alert('生成 PDF 失敗：' + error.message + '\n\n請重新整理頁面後再試一次');
+    console.error('PDF Error:', error);
+    alert('生成 PDF 失敗：' + error.message);
     btn.innerHTML = originalText;
     btn.disabled = false;
   }
 }
 
-// 創建 PDF 的 HTML 內容
-function createPDFHTML(data) {
-  const scoreColor = getScoreColor(data.overallScore);
-  
-  let html = `
-    <div style="font-family: 'Noto Sans TC', 'Microsoft YaHei', 'PingFang TC', sans-serif; color: #1a2332; line-height: 1.6; padding: 10px;">
-      
-      <!-- 封面 -->
-      <div class="no-break" style="background: linear-gradient(135deg, #1a4d7a 0%, #0f3555 100%); color: white; padding: 35px 25px; text-align: center; margin-bottom: 25px; border-radius: 8px;">
-        <h1 style="font-size: 28px; margin: 0 0 12px 0; font-weight: 900; letter-spacing: 1px;">SEO 健康分析報告</h1>
-        <p style="font-size: 13px; opacity: 0.9; margin: 0;">專業網站 SEO 診斷與優化建議</p>
-      </div>
-      
-      <!-- 網站資訊 -->
-      <div class="no-break" style="background: #f8f9fc; padding: 18px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #f39c12;">
-        <div style="margin-bottom: 6px; font-size: 13px;"><strong>網站：</strong>${data.siteUrl}</div>
-        ${data.targetKeywords ? `<div style="margin-bottom: 6px; font-size: 13px;"><strong>目標關鍵字：</strong>${data.targetKeywords}</div>` : ''}
-        <div style="font-size: 13px;"><strong>分析日期：</strong>${data.date}</div>
-      </div>
-      
-      <!-- 總體評分 -->
-      <div class="no-break" style="text-align: center; margin-bottom: 25px;">
-        <h2 style="color: #1a4d7a; margin-bottom: 12px; font-size: 20px;">總體評分</h2>
-        <div style="display: inline-block; width: 100px; height: 100px; border-radius: 50%; background: ${scoreColor}; color: white; line-height: 100px; font-size: 42px; font-weight: 900; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-          ${data.overallScore}
-        </div>
-        <div style="margin-top: 8px; color: #5a6c7d; font-size: 14px;">滿分 100</div>
-      </div>
-      
-      <!-- 分項評分 -->
-      <div class="no-break">
-        <h2 style="color: #1a4d7a; margin: 20px 0 12px 0; font-size: 18px; border-bottom: 2px solid #f39c12; padding-bottom: 6px;">分項評分</h2>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 25px;">
-  `;
-  
-  Object.entries(data.scores).forEach(([key, value]) => {
-    const color = getScoreColor(value);
-    html += `
-      <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #e1e8ed; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-          <span style="font-weight: 600; color: #1a2332; font-size: 13px;">${key}</span>
-          <span style="font-size: 20px; font-weight: 700; color: ${color};">${value}</span>
-        </div>
-        <div style="background: #f0f0f0; height: 6px; border-radius: 3px; overflow: hidden;">
-          <div style="background: ${color}; height: 100%; width: ${value}%;"></div>
-        </div>
-      </div>
-    `;
-  });
-  
-  html += `</div></div>`;
-  
-  // 嚴重問題
-  if (data.criticalIssues && data.criticalIssues.length > 0) {
-    html += `
-      <div class="no-break" style="margin-bottom: 20px;">
-        <h2 style="color: #e74c3c; margin: 20px 0 12px 0; font-size: 18px; border-bottom: 2px solid #e74c3c; padding-bottom: 6px;">🚨 嚴重問題</h2>
-        <div style="background: #fee; padding: 16px; border-radius: 6px; border-left: 4px solid #e74c3c;">
-          <ol style="margin: 0; padding-left: 20px; font-size: 13px;">
-    `;
-    
-    data.criticalIssues.forEach(issue => {
-      html += `<li style="margin-bottom: 8px; color: #721c24;">${issue}</li>`;
-    });
-    
-    html += `
-          </ol>
-        </div>
-      </div>
-    `;
-  }
-  
-  // 優化建議
-  html += `
-    <div class="page-break-before">
-      <h2 style="color: #1a4d7a; margin: 20px 0 12px 0; font-size: 18px; border-bottom: 2px solid #f39c12; padding-bottom: 6px;">💡 優化建議</h2>
-    </div>
-  `;
-  
-  data.suggestions.forEach((suggestion, index) => {
-    const priorityColor = 
-      suggestion.priority === '高' ? '#e74c3c' :
-      suggestion.priority === '中' ? '#f39c12' : '#27ae60';
-    
-    const priorityBg = 
-      suggestion.priority === '高' ? '#fee' :
-      suggestion.priority === '中' ? '#fff3cd' : '#d4edda';
-    
-    html += `
-      <div class="no-break" style="margin-bottom: 16px; background: white; border: 1px solid #e1e8ed; border-radius: 6px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-        <div style="background: ${priorityColor}; color: white; padding: 8px 12px; font-weight: 600; font-size: 12px;">
-          [${suggestion.priority}優先級] ${suggestion.category}
-        </div>
-        <div style="padding: 12px;">
-          <h3 style="margin: 0 0 8px 0; font-size: 14px; color: #1a2332; font-weight: 600;">${suggestion.title}</h3>
-          <p style="margin: 0 0 8px 0; color: #5a6c7d; line-height: 1.7; font-size: 12px;">${suggestion.description}</p>
-          <div style="background: ${priorityBg}; padding: 8px; border-radius: 4px; border-left: 3px solid ${priorityColor}; font-size: 12px;">
-            <strong style="color: ${priorityColor};">預期影響：</strong>
-            <span style="color: #1a2332;">${suggestion.impact}</span>
-          </div>
-        </div>
-      </div>
-    `;
-  });
-  
-  // 快速改善項目
-  if (data.quickWins && data.quickWins.length > 0) {
-    html += `
-      <div class="no-break" style="margin-top: 25px;">
-        <h2 style="color: #27ae60; margin: 20px 0 12px 0; font-size: 18px; border-bottom: 2px solid #27ae60; padding-bottom: 6px;">⚡ 快速改善項目</h2>
-        <div style="background: #d4edda; padding: 16px; border-radius: 6px; border-left: 4px solid #27ae60;">
-          <ol style="margin: 0; padding-left: 20px; font-size: 13px;">
-    `;
-    
-    data.quickWins.forEach(win => {
-      html += `<li style="margin-bottom: 8px; color: #155724;">${win}</li>`;
-    });
-    
-    html += `
-          </ol>
-        </div>
-      </div>
-    `;
-  }
-  
-  // 頁尾
-  html += `
-      <div style="margin-top: 35px; padding-top: 18px; border-top: 2px solid #e1e8ed; text-align: center; color: #5a6c7d; font-size: 11px;">
-        <p style="margin: 4px 0;">本報告由 <strong style="color: #1a4d7a;">SEO 智能助手</strong> 生成</p>
-        <p style="margin: 4px 0;">技術支持：<strong style="color: #f39c12;">Billion Studio</strong></p>
-        <p style="margin: 4px 0;">生成日期：${data.date}</p>
-      </div>
-      
-    </div>
-  `;
-  
-  return html;
+// RGB 顏色轉換
+function getScoreColorRGB(score) {
+  if (score >= 80) return [39, 174, 96];
+  if (score >= 60) return [243, 156, 18];
+  return [231, 76, 60];
 }
 
 // 輔助函數：將分數轉換為 RGB 顏色
