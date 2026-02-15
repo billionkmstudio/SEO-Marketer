@@ -722,6 +722,12 @@ async function generateSEOPDF() {
     return;
   }
   
+  // 檢查 html2pdf 是否已載入
+  if (typeof html2pdf === 'undefined') {
+    alert('PDF 函式庫載入失敗，請重新整理頁面後再試');
+    return;
+  }
+  
   const data = window.seoReportData;
   
   // 顯示載入中
@@ -744,25 +750,30 @@ async function generateSEOPDF() {
     
     // 設定 PDF 選項
     const opt = {
-      margin: [15, 15, 20, 15],
+      margin: [10, 10, 15, 10],
       filename: `SEO分析報告_${data.siteUrl.replace(/https?:\/\//, '').replace(/[\/\:]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
+      image: { type: 'jpeg', quality: 0.95 },
       html2canvas: { 
         scale: 2,
         useCORS: true,
         letterRendering: true,
-        logging: false
+        logging: false,
+        windowWidth: 794 // A4 寬度 (像素)
       },
       jsPDF: { 
         unit: 'mm', 
         format: 'a4', 
-        orientation: 'portrait',
-        compress: true
+        orientation: 'portrait'
       },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      pagebreak: { 
+        mode: ['avoid-all', 'css', 'legacy'],
+        before: '.page-break-before',
+        after: '.page-break-after',
+        avoid: '.no-break'
+      }
     };
     
-    // 生成 PDF
+    // 生成並下載 PDF
     await html2pdf().set(opt).from(container).save();
     
     // 移除臨時容器
@@ -777,7 +788,12 @@ async function generateSEOPDF() {
     
   } catch (error) {
     console.error('PDF generation error:', error);
-    alert('生成 PDF 失敗：' + error.message);
+    
+    // 清理可能殘留的容器
+    const containers = document.querySelectorAll('[style*="-9999px"]');
+    containers.forEach(c => c.remove());
+    
+    alert('生成 PDF 失敗：' + error.message + '\n\n請重新整理頁面後再試一次');
     btn.innerHTML = originalText;
     btn.disabled = false;
   }
@@ -788,63 +804,64 @@ function createPDFHTML(data) {
   const scoreColor = getScoreColor(data.overallScore);
   
   let html = `
-    <div style="font-family: 'Noto Sans TC', 'Microsoft YaHei', sans-serif; color: #1a2332; line-height: 1.6;">
+    <div style="font-family: 'Noto Sans TC', 'Microsoft YaHei', 'PingFang TC', sans-serif; color: #1a2332; line-height: 1.6; padding: 10px;">
       
       <!-- 封面 -->
-      <div style="background: linear-gradient(135deg, #1a4d7a 0%, #0f3555 100%); color: white; padding: 40px 30px; text-align: center; margin-bottom: 30px; border-radius: 8px;">
-        <h1 style="font-size: 32px; margin: 0 0 15px 0; font-weight: 900;">SEO 健康分析報告</h1>
-        <p style="font-size: 14px; opacity: 0.9; margin: 0;">專業網站 SEO 診斷與優化建議</p>
+      <div class="no-break" style="background: linear-gradient(135deg, #1a4d7a 0%, #0f3555 100%); color: white; padding: 35px 25px; text-align: center; margin-bottom: 25px; border-radius: 8px;">
+        <h1 style="font-size: 28px; margin: 0 0 12px 0; font-weight: 900; letter-spacing: 1px;">SEO 健康分析報告</h1>
+        <p style="font-size: 13px; opacity: 0.9; margin: 0;">專業網站 SEO 診斷與優化建議</p>
       </div>
       
       <!-- 網站資訊 -->
-      <div style="background: #f8f9fc; padding: 20px; border-radius: 8px; margin-bottom: 25px; border-left: 4px solid #f39c12;">
-        <div style="margin-bottom: 8px;"><strong>網站：</strong>${data.siteUrl}</div>
-        ${data.targetKeywords ? `<div style="margin-bottom: 8px;"><strong>目標關鍵字：</strong>${data.targetKeywords}</div>` : ''}
-        <div><strong>分析日期：</strong>${data.date}</div>
+      <div class="no-break" style="background: #f8f9fc; padding: 18px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #f39c12;">
+        <div style="margin-bottom: 6px; font-size: 13px;"><strong>網站：</strong>${data.siteUrl}</div>
+        ${data.targetKeywords ? `<div style="margin-bottom: 6px; font-size: 13px;"><strong>目標關鍵字：</strong>${data.targetKeywords}</div>` : ''}
+        <div style="font-size: 13px;"><strong>分析日期：</strong>${data.date}</div>
       </div>
       
       <!-- 總體評分 -->
-      <div style="text-align: center; margin-bottom: 30px;">
-        <h2 style="color: #1a4d7a; margin-bottom: 15px; font-size: 24px;">總體評分</h2>
-        <div style="display: inline-block; width: 120px; height: 120px; border-radius: 50%; background: ${scoreColor}; color: white; line-height: 120px; font-size: 48px; font-weight: 900; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+      <div class="no-break" style="text-align: center; margin-bottom: 25px;">
+        <h2 style="color: #1a4d7a; margin-bottom: 12px; font-size: 20px;">總體評分</h2>
+        <div style="display: inline-block; width: 100px; height: 100px; border-radius: 50%; background: ${scoreColor}; color: white; line-height: 100px; font-size: 42px; font-weight: 900; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
           ${data.overallScore}
         </div>
-        <div style="margin-top: 10px; color: #5a6c7d; font-size: 16px;">滿分 100</div>
+        <div style="margin-top: 8px; color: #5a6c7d; font-size: 14px;">滿分 100</div>
       </div>
       
       <!-- 分項評分 -->
-      <h2 style="color: #1a4d7a; margin: 30px 0 15px 0; font-size: 22px; border-bottom: 2px solid #f39c12; padding-bottom: 8px;">分項評分</h2>
-      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 30px;">
+      <div class="no-break">
+        <h2 style="color: #1a4d7a; margin: 20px 0 12px 0; font-size: 18px; border-bottom: 2px solid #f39c12; padding-bottom: 6px;">分項評分</h2>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 25px;">
   `;
   
   Object.entries(data.scores).forEach(([key, value]) => {
     const color = getScoreColor(value);
     html += `
-      <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e1e8ed; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <span style="font-weight: 600; color: #1a2332;">${key}</span>
-          <span style="font-size: 24px; font-weight: 700; color: ${color};">${value}</span>
+      <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #e1e8ed; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span style="font-weight: 600; color: #1a2332; font-size: 13px;">${key}</span>
+          <span style="font-size: 20px; font-weight: 700; color: ${color};">${value}</span>
         </div>
-        <div style="background: #f0f0f0; height: 8px; border-radius: 4px; overflow: hidden;">
-          <div style="background: ${color}; height: 100%; width: ${value}%; transition: width 0.3s;"></div>
+        <div style="background: #f0f0f0; height: 6px; border-radius: 3px; overflow: hidden;">
+          <div style="background: ${color}; height: 100%; width: ${value}%;"></div>
         </div>
       </div>
     `;
   });
   
-  html += `</div>`;
+  html += `</div></div>`;
   
   // 嚴重問題
   if (data.criticalIssues && data.criticalIssues.length > 0) {
     html += `
-      <div style="page-break-inside: avoid; margin-bottom: 25px;">
-        <h2 style="color: #e74c3c; margin: 25px 0 15px 0; font-size: 22px; border-bottom: 2px solid #e74c3c; padding-bottom: 8px;">🚨 嚴重問題</h2>
-        <div style="background: #fee; padding: 20px; border-radius: 8px; border-left: 4px solid #e74c3c;">
-          <ol style="margin: 0; padding-left: 20px;">
+      <div class="no-break" style="margin-bottom: 20px;">
+        <h2 style="color: #e74c3c; margin: 20px 0 12px 0; font-size: 18px; border-bottom: 2px solid #e74c3c; padding-bottom: 6px;">🚨 嚴重問題</h2>
+        <div style="background: #fee; padding: 16px; border-radius: 6px; border-left: 4px solid #e74c3c;">
+          <ol style="margin: 0; padding-left: 20px; font-size: 13px;">
     `;
     
     data.criticalIssues.forEach(issue => {
-      html += `<li style="margin-bottom: 10px; color: #721c24;">${issue}</li>`;
+      html += `<li style="margin-bottom: 8px; color: #721c24;">${issue}</li>`;
     });
     
     html += `
@@ -856,7 +873,9 @@ function createPDFHTML(data) {
   
   // 優化建議
   html += `
-    <h2 style="color: #1a4d7a; margin: 30px 0 15px 0; font-size: 22px; border-bottom: 2px solid #f39c12; padding-bottom: 8px;">💡 優化建議</h2>
+    <div class="page-break-before">
+      <h2 style="color: #1a4d7a; margin: 20px 0 12px 0; font-size: 18px; border-bottom: 2px solid #f39c12; padding-bottom: 6px;">💡 優化建議</h2>
+    </div>
   `;
   
   data.suggestions.forEach((suggestion, index) => {
@@ -869,14 +888,14 @@ function createPDFHTML(data) {
       suggestion.priority === '中' ? '#fff3cd' : '#d4edda';
     
     html += `
-      <div style="page-break-inside: avoid; margin-bottom: 20px; background: white; border: 1px solid #e1e8ed; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-        <div style="background: ${priorityColor}; color: white; padding: 10px 15px; font-weight: 600;">
+      <div class="no-break" style="margin-bottom: 16px; background: white; border: 1px solid #e1e8ed; border-radius: 6px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+        <div style="background: ${priorityColor}; color: white; padding: 8px 12px; font-weight: 600; font-size: 12px;">
           [${suggestion.priority}優先級] ${suggestion.category}
         </div>
-        <div style="padding: 15px;">
-          <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #1a2332;">${suggestion.title}</h3>
-          <p style="margin: 0 0 10px 0; color: #5a6c7d; line-height: 1.8;">${suggestion.description}</p>
-          <div style="background: ${priorityBg}; padding: 10px; border-radius: 4px; border-left: 3px solid ${priorityColor};">
+        <div style="padding: 12px;">
+          <h3 style="margin: 0 0 8px 0; font-size: 14px; color: #1a2332; font-weight: 600;">${suggestion.title}</h3>
+          <p style="margin: 0 0 8px 0; color: #5a6c7d; line-height: 1.7; font-size: 12px;">${suggestion.description}</p>
+          <div style="background: ${priorityBg}; padding: 8px; border-radius: 4px; border-left: 3px solid ${priorityColor}; font-size: 12px;">
             <strong style="color: ${priorityColor};">預期影響：</strong>
             <span style="color: #1a2332;">${suggestion.impact}</span>
           </div>
@@ -888,14 +907,14 @@ function createPDFHTML(data) {
   // 快速改善項目
   if (data.quickWins && data.quickWins.length > 0) {
     html += `
-      <div style="page-break-inside: avoid; margin-top: 30px;">
-        <h2 style="color: #27ae60; margin: 25px 0 15px 0; font-size: 22px; border-bottom: 2px solid #27ae60; padding-bottom: 8px;">⚡ 快速改善項目</h2>
-        <div style="background: #d4edda; padding: 20px; border-radius: 8px; border-left: 4px solid #27ae60;">
-          <ol style="margin: 0; padding-left: 20px;">
+      <div class="no-break" style="margin-top: 25px;">
+        <h2 style="color: #27ae60; margin: 20px 0 12px 0; font-size: 18px; border-bottom: 2px solid #27ae60; padding-bottom: 6px;">⚡ 快速改善項目</h2>
+        <div style="background: #d4edda; padding: 16px; border-radius: 6px; border-left: 4px solid #27ae60;">
+          <ol style="margin: 0; padding-left: 20px; font-size: 13px;">
     `;
     
     data.quickWins.forEach(win => {
-      html += `<li style="margin-bottom: 10px; color: #155724;">${win}</li>`;
+      html += `<li style="margin-bottom: 8px; color: #155724;">${win}</li>`;
     });
     
     html += `
@@ -907,10 +926,10 @@ function createPDFHTML(data) {
   
   // 頁尾
   html += `
-      <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #e1e8ed; text-align: center; color: #5a6c7d; font-size: 12px;">
-        <p style="margin: 5px 0;">本報告由 <strong style="color: #1a4d7a;">SEO 智能助手</strong> 生成</p>
-        <p style="margin: 5px 0;">技術支持：<strong style="color: #f39c12;">Billion Studio</strong></p>
-        <p style="margin: 5px 0;">生成日期：${data.date}</p>
+      <div style="margin-top: 35px; padding-top: 18px; border-top: 2px solid #e1e8ed; text-align: center; color: #5a6c7d; font-size: 11px;">
+        <p style="margin: 4px 0;">本報告由 <strong style="color: #1a4d7a;">SEO 智能助手</strong> 生成</p>
+        <p style="margin: 4px 0;">技術支持：<strong style="color: #f39c12;">Billion Studio</strong></p>
+        <p style="margin: 4px 0;">生成日期：${data.date}</p>
       </div>
       
     </div>
