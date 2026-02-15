@@ -407,10 +407,8 @@ async function distributeContent() {
   
   if (document.getElementById('platformFB').checked) platforms.push('Facebook');
   if (document.getElementById('platformIG').checked) platforms.push('Instagram');
-  if (document.getElementById('platformThreads').checked) platforms.push('Threads');
   if (document.getElementById('platformXHS').checked) platforms.push('小紅書');
-  if (document.getElementById('platformLinkedIn').checked) platforms.push('LinkedIn');
-  if (document.getElementById('platformGBP').checked) platforms.push('Google 商家');
+  if (document.getElementById('platformThreads').checked) platforms.push('Threads');
   
   const btn = document.getElementById('distributeBtn');
   const resultArea = document.getElementById('distributeResult');
@@ -421,7 +419,7 @@ async function distributeContent() {
   }
   
   if (platforms.length === 0) {
-    alert('請至少選擇一個分發平台');
+    alert('請至少選擇一個目標平台');
     return;
   }
   
@@ -456,11 +454,9 @@ async function distributeContent() {
 注意：
 1. Facebook：可以較長（300-500字），包含表情符號，鼓勵互動提問
 2. Instagram：簡短有力（150-200字），多用表情符號，包含 3-5 個熱門標籤
-3. Threads：簡潔對話式（100-150字），輕鬆友善的語氣
-4. 小紅書：標題黨風格，多用表情符號，分段清晰，包含熱門標籤
-5. LinkedIn：專業正式（200-300字），強調價值和專業見解，避免過多表情符號
-6. Google 商家：簡潔明瞭（100-150字），包含行動呼籲和聯絡資訊
-7. 所有內容都應使用繁體中文`;
+3. 小紅書：標題黨風格，多用表情符號，分段清晰，包含熱門標籤
+4. Threads：簡潔對話式（100-150字），輕鬆友善的語氣
+5. 所有內容都應使用繁體中文`;
 
     const response = await callClaudeAPI(prompt, systemPrompt);
     
@@ -472,15 +468,13 @@ async function distributeContent() {
       throw new Error('無法解析 API 回應');
     }
     
-    let html = '<h3>📢 分發內容</h3><p class="hint" style="margin-bottom: 20px;">💡 請複製以下內容到對應平台手動發布</p>';
+    let html = '<h3>📢 多平台文案</h3><p class="hint" style="margin-bottom: 20px; background: #fff3cd; padding: 12px; border-left: 3px solid #f39c12;">💡 請複製以下內容到對應平台手動發布</p>';
     
     const platformIcons = {
       'Facebook': '📘',
       'Instagram': '📷',
       'Threads': '🧵',
-      '小紅書': '📕',
-      'LinkedIn': '💼',
-      'Google 商家': '🏢'
+      '小紅書': '📕'
     };
     
     data.platforms.forEach(platform => {
